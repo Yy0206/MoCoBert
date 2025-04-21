@@ -70,72 +70,12 @@ def train(model, momentum_encoder, train_dl, dev_dl, optimizer, contrast_loss_fn
                 for param, m_param in zip(model.parameters(), momentum_encoder.parameters()):
                     m_param.data = gamma * m_param.data + (1 - gamma) * param.data
 
-        # 验证
-        results = evaluate(model, dev_dl, device)
-        logger.info(f"Epoch {epoch} | Test Acc: {results['accuracy']:.4f} | F1: {results['macro_f1']:.4f}")
 
         if results['macro_f1'] > best_f1:
             best_f1 = results['macro_f1']
             torch.save(model.state_dict(), save_path)
             logger.info(f"New best model saved with F1: {best_f1:.4f}")
 
-
-def evaluate(model, dataloader, device):
-    model.eval()
-    all_preds = []
-    all_labels = []
-    with torch.no_grad():
-        for inputs, labels in tqdm(dataloader):
-            # 调整输入处理方式
-            input_ids = inputs['input_ids'].to(device)
-            attention_mask = inputs['attention_mask'].to(device)
-            token_type_ids = inputs['token_type_ids'].to(device)
-
-            _, logits = model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                token_type_ids=token_type_ids
-            )
-            preds = torch.argmax(logits, dim=1).cpu().numpy()
-            all_preds.extend(preds)
-            all_labels.extend(labels.numpy())
-
-    # 计算并打印分类报告和其他指标
-    accuracy = accuracy_score(all_labels, all_preds)
-    macro_f1 = f1_score(all_labels, all_preds, average='macro')
-    report = classification_report(all_labels, all_preds, digits=4, zero_division=0)
-
-    logger.info(f"Accuracy: {accuracy:.4f}")
-    logger.info(f"Macro F1: {macro_f1:.4f}")
-    logger.info(f"Classification Report:\n{report}")
-
-    # 混淆矩阵绘制
-    cm = confusion_matrix(all_labels, all_preds)
-    plot_confusion_matrix(cm)
-
-    return {
-        "accuracy": accuracy,
-        "macro_f1": macro_f1,
-        "report": report
-    }
-
-
-def plot_confusion_matrix(cm, save_path='/data/yanyan/SimCSE-Pytorch-master/log/confusion_matrix.png'):
-    # 获取当前时间戳，确保文件名唯一
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    file_name = f"confusion_matrix_{timestamp}.png"
-    full_save_path = save_path.replace("confusion_matrix.png", file_name)
-
-    # 绘制混淆矩阵的热力图
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=np.arange(cm.shape[1]),
-                yticklabels=np.arange(cm.shape[0]))
-    plt.xlabel('Predicted Labels')
-    plt.ylabel('True Labels')
-    plt.title('Confusion Matrix Heatmap')
-    plt.savefig(full_save_path)  # 保存到指定路径
-    logger.info(f"Confusion matrix saved at {full_save_path}")
-    plt.close()
 
 
 def main(args):
